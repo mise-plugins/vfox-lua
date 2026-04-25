@@ -110,7 +110,7 @@ function PLUGIN:PostInstall(ctx)
         os.execute(string.format("rm -rf '%s/luarocks.tar.gz' '%s/luarocks-'*", sdkPath, sdkPath))
     end
 
-    -- Clean up Lua source files (keep only bin, lib, include, man, share, luarocks)
+    -- Clean up Lua source files (keep bin, lib, include, man, share, src, luarocks)
     local cleanCmd = string.format("cd '%s' && rm -rf doc Makefile README install 2>/dev/null", sdkPath)
     os.execute(cleanCmd)
 end
