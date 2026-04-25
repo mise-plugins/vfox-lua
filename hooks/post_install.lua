@@ -111,6 +111,6 @@ function PLUGIN:PostInstall(ctx)
     end
 
     -- Clean up Lua source files (keep only bin, lib, include, man, share, luarocks)
-    local cleanCmd = string.format("cd '%s' && rm -rf src doc Makefile README install 2>/dev/null", sdkPath)
+    local cleanCmd = string.format("cd '%s' && rm -rf doc Makefile README install 2>/dev/null", sdkPath)
     os.execute(cleanCmd)
 end
