@@ -1,57 +1,72 @@
---- Compiles and installs Lua from source
+--- Compiles and installs Lua from source using the zig build system.
 --- @param ctx table Context provided by vfox
 --- @field ctx.sdkInfo table SDK information with version and path
 function PLUGIN:PostInstall(ctx)
+    local platform = require("platform")
+    local version = require("version")
+    local cmd = require("cmd")
     local http = require("http")
     local json = require("json")
 
     local sdkInfo = ctx.sdkInfo["lua"]
     local version = sdkInfo.version
     local sdkPath = sdkInfo.path
+    local sep = platform.sep
 
-    -- mise extracts tarball and strips top-level directory, so sdkPath IS the source directory
+    local function join(...)
+        return table.concat({ ... }, sep)
+    end
 
-    -- Determine OS-specific make target
-    local os_type = RUNTIME.osType
-    local make_target = "guess"
+    local plug = RUNTIME.pluginDirPath
 
-    if os_type == "darwin" then
-        make_target = "macosx"
-    elseif os_type == "linux" then
-        -- For Lua < 5.4, use "linux", otherwise "guess"
-        local major, minor = string.match(version, "^(%d+)%.(%d+)")
-        if major and minor then
-            local ver_num = tonumber(major) * 100 + tonumber(minor)
-            if ver_num < 504 then
-                make_target = "linux"
-            end
+    -- Copy build.zig and readline shim into extracted source tree
+    platform.mkdir(join(sdkPath, "readline"))
+
+    local files = {
+        "build.zig",
+        "build.zig.zon",
+        "lib/readline_shim.c",
+        "lib/test_readline_shim.c",
+        "lib/readline/readline.h",
+        "lib/readline/history.h",
+    }
+    for _, f in ipairs(files) do
+        local normal = f:gsub("/", sep)
+        if not platform.cp(join(plug, normal), join(sdkPath, normal)) then
+            error("Failed to copy " .. f)
         end
     end
 
-    -- Build Lua
-    local major = tonumber(string.match(version, "^(%d+)"))
-    local buildCmd
-
-    if major and major >= 5 then
-        -- Lua 5.x: use make local target which creates install/ subdirectory
-        buildCmd = string.format("cd '%s' && make %s && make local", sdkPath, make_target)
-    else
-        -- Older versions
-        buildCmd = string.format("cd '%s' && make && make install INSTALL_ROOT=install", sdkPath)
+    -- Build Lua via zig (compiles liblua.a, lua, luac, and installs headers)
+    local ok, out = pcall(
+        cmd.exec,
+        "mise exec zig@0.16.0 -- zig build --build-file "
+            .. sdkPath
+            .. sep
+            .. "build.zig -Dreadline --prefix "
+            .. sdkPath
+            .. sep
+            .. "install",
+        { cwd = sdkPath }
+    )
+    if not ok then
+        error("zig build failed:\n" .. out)
     end
 
-    local status = os.execute(buildCmd)
-    if status ~= 0 and status ~= true then
-        error("Failed to build Lua: make failed")
+    -- Move build artifacts from install/ to sdkPath root
+    local installDir = join(sdkPath, "install")
+    for _, entry in ipairs(platform.listdir(installDir)) do
+        platform.mv(join(installDir, entry), join(sdkPath, entry))
     end
 
-    -- After make local, files are in install/ subdirectory
-    -- Move them to the root of sdkPath (overwriting source files is fine)
-    local moveCmd = string.format("cd '%s' && mv install/* . 2>/dev/null || cp -r install/* . 2>/dev/null", sdkPath)
-    os.execute(moveCmd)
+    -- Remove build artifacts and source files
+    for _, item in ipairs({ "install", "zig-out", ".zig-cache", "zig-pkg", "build.zig", "build.zig.zon", "readline" }) do
+        platform.rm(join(sdkPath, item))
+    end
 
     -- Install LuaRocks for Lua 5.x
-    if major and major >= 5 then
+    local ver = version.parse(version)
+    if ver and ver.major >= 5 then
         -- Get latest LuaRocks version from GitHub releases
         local luarocksVersion = "3.11.1" -- Default fallback
 
@@ -72,45 +87,70 @@ function PLUGIN:PostInstall(ctx)
 
         -- Download and install LuaRocks
         local luarocksUrl = "https://github.com/luarocks/luarocks/archive/refs/tags/v" .. luarocksVersion .. ".tar.gz"
-        local luarocksArchive = sdkPath .. "/luarocks.tar.gz"
+        local luarocksArchive = sdkPath .. sep .. "luarocks.tar.gz"
 
-        local downloadCmd = string.format("curl -sL '%s' -o '%s'", luarocksUrl, luarocksArchive)
-        status = os.execute(downloadCmd)
-        if status ~= 0 and status ~= true then
-            -- LuaRocks installation is optional, don't fail
-            return
+        local archiver = require("archiver")
+        local _, dlerr = http.download_file({ url = luarocksUrl }, luarocksArchive)
+        if dlerr then
+            error("failed to download luarocks: " .. tostring(dlerr))
         end
 
-        local extractCmd = string.format("cd '%s' && tar xzf luarocks.tar.gz", sdkPath)
-        status = os.execute(extractCmd)
-        if status ~= 0 and status ~= true then
-            return
+        archiver.decompress(luarocksArchive, sdkPath)
+
+        local luarocksDir = sdkPath .. sep .. "luarocks-" .. luarocksVersion
+
+        if RUNTIME.osType == "windows" then
+            -- Windows: use install.bat provided by LuaRocks
+            platform.cp(sdkPath .. sep .. "lib" .. sep .. "lua.lib", sdkPath .. sep .. "lib" .. sep .. "lua5.4.lib")
+            local ok, out = pcall(
+                cmd.exec,
+                sdkPath
+                    .. sep
+                    .. "bin"
+                    .. sep
+                    .. "lua.exe install.bat /LUA "
+                    .. sdkPath
+                    .. " /P "
+                    .. sdkPath
+                    .. sep
+                    .. "luarocks /NOADMIN /NOREG /F",
+                { cwd = luarocksDir }
+            )
+            if not ok then
+                error("luarocks install failed:\n" .. out)
+            end
+        else
+            -- Unix: configure + make bootstrap
+            local ok, out = pcall(
+                cmd.exec,
+                "./configure --with-lua='"
+                    .. sdkPath
+                    .. "' --with-lua-include='"
+                    .. sdkPath
+                    .. "/include' --with-lua-lib='"
+                    .. sdkPath
+                    .. "/lib' --prefix='"
+                    .. sdkPath
+                    .. "/luarocks'",
+                { cwd = luarocksDir }
+            )
+            if ok then
+                local ok2, out2 = pcall(cmd.exec, "make bootstrap", { cwd = luarocksDir })
+                if not ok2 then
+                    error("luarocks build failed:\n" .. out2)
+                end
+            end
         end
 
-        local luarocksDir = sdkPath .. "/luarocks-" .. luarocksVersion
-        local configureCmd = string.format(
-            "cd '%s' && ./configure --with-lua='%s' --with-lua-include='%s/include' --with-lua-lib='%s/lib' --prefix='%s/luarocks' 2>/dev/null",
-            luarocksDir,
-            sdkPath,
-            sdkPath,
-            sdkPath,
-            sdkPath
-        )
-        status = os.execute(configureCmd)
-        if status ~= 0 and status ~= true then
-            -- Clean up and return without luarocks
-            os.execute(string.format("rm -rf '%s/luarocks.tar.gz' '%s/luarocks-'*", sdkPath, sdkPath))
-            return
+        -- Clean up LuaRocks source and archive
+        platform.rm(luarocksArchive)
+        if platform.exists(luarocksDir) then
+            platform.rm(luarocksDir)
         end
-
-        local bootstrapCmd = string.format("cd '%s' && make bootstrap 2>&1", luarocksDir)
-        os.execute(bootstrapCmd)
-
-        -- Clean up LuaRocks source
-        os.execute(string.format("rm -rf '%s/luarocks.tar.gz' '%s/luarocks-'*", sdkPath, sdkPath))
     end
 
-    -- Clean up Lua source files (keep only bin, lib, include, man, share, luarocks)
-    local cleanCmd = string.format("cd '%s' && rm -rf src doc Makefile README install 2>/dev/null", sdkPath)
-    os.execute(cleanCmd)
+    -- Clean up Lua source files, keeping only bin/, lib/, include/, share/
+    for _, item in ipairs({ "src", "doc", "Makefile", "README" }) do
+        platform.rm(sdkPath .. sep .. item)
+    end
 end

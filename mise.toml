@@ -6,12 +6,14 @@ actionlint = "latest"
 hk = "latest"
 lua = "5.4"
 lua-language-server = "latest"
+make = "latest"
 pkl = "latest"
 stylua = "latest"
+zig = "0.16.0"
 
 [tasks.format]
 description = "Format Lua scripts"
-run = "stylua metadata.lua hooks/"
+run = "stylua metadata.lua hooks/ lib/"
 
 [tasks.lint]
 description = "Lint Lua scripts and GitHub Actions using hk"
@@ -24,3 +26,4 @@ run = "hk fix"
 [tasks.ci]
 description = "Run all CI checks"
 depends = ["lint", "test"]
+
