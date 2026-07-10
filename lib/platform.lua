@@ -30,7 +30,7 @@ end
 
 function M.mkdir(path)
     if os_type == "windows" then
-        os.execute("mkdir " .. path .. " 2>nul")
+        os.execute('mkdir "' .. path .. '" 2>nul')
     else
         os.execute("mkdir -p '" .. path .. "' 2>/dev/null")
     end
@@ -41,7 +41,7 @@ function M.mv(src, dst)
         local ok, _ = pcall(os.rename, src, dst)
         if not ok then
             M.cp(src, dst)
-            os.execute("del /f /q " .. src .. " 2>nul")
+            os.execute('del /f /q "' .. src .. '" 2>nul')
         end
     else
         local ok = os.execute("mv '" .. src .. "' '" .. dst .. "' 2>/dev/null")
@@ -55,7 +55,7 @@ end
 function M.listdir(path)
     local entries = {}
     if os_type == "windows" then
-        local f = io.popen("dir /b " .. path .. " 2>nul")
+        local f = io.popen('dir /b "' .. path .. '" 2>nul')
         if f then
             for entry in f:lines() do
                 table.insert(entries, entry)
@@ -76,7 +76,7 @@ end
 
 function M.exists(path)
     local f, _, code = io.open(path)
-    if code == 13 or code == 5 then
+    if code == 13 or code == 5 or code == 21 then
         return true
     end
     if f then
@@ -88,8 +88,8 @@ end
 
 function M.rm(path)
     if os_type == "windows" then
-        os.execute("rmdir /s /q " .. path .. " 2>nul")
-        os.execute("del /f /q " .. path .. " 2>nul")
+        os.execute('rmdir /s /q "' .. path .. '" 2>nul')
+        os.execute('del /f /q "' .. path .. '" 2>nul')
     else
         os.execute("rm -rf '" .. path .. "' 2>/dev/null")
     end

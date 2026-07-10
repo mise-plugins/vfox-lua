@@ -9,7 +9,7 @@ function PLUGIN:PostInstall(ctx)
     local json = require("json")
 
     local sdkInfo = ctx.sdkInfo["lua"]
-    local version = sdkInfo.version
+    local luaVersion = sdkInfo.version
     local sdkPath = sdkInfo.path
     local sep = platform.sep
 
@@ -26,7 +26,6 @@ function PLUGIN:PostInstall(ctx)
         "build.zig",
         "build.zig.zon",
         "lib/readline_shim.c",
-        "lib/test_readline_shim.c",
         "lib/readline/readline.h",
         "lib/readline/history.h",
     }
@@ -40,13 +39,7 @@ function PLUGIN:PostInstall(ctx)
     -- Build Lua via zig (compiles liblua.a, lua, luac, and installs headers)
     local ok, out = pcall(
         cmd.exec,
-        "mise exec zig@0.16.0 -- zig build --build-file "
-            .. sdkPath
-            .. sep
-            .. "build.zig -Dreadline --prefix "
-            .. sdkPath
-            .. sep
-            .. "install",
+        "zig build --build-file " .. sdkPath .. sep .. "build.zig -Dreadline --prefix " .. sdkPath .. sep .. "install",
         { cwd = sdkPath }
     )
     if not ok then
@@ -65,7 +58,7 @@ function PLUGIN:PostInstall(ctx)
     end
 
     -- Install LuaRocks for Lua 5.x
-    local ver = version.parse(version)
+    local ver = version.parse(luaVersion)
     if ver and ver.major >= 5 then
         -- Get latest LuaRocks version from GitHub releases
         local luarocksVersion = "3.11.1" -- Default fallback
@@ -101,7 +94,8 @@ function PLUGIN:PostInstall(ctx)
 
         if RUNTIME.osType == "windows" then
             -- Windows: use install.bat provided by LuaRocks
-            platform.cp(sdkPath .. sep .. "lib" .. sep .. "lua.lib", sdkPath .. sep .. "lib" .. sep .. "lua5.4.lib")
+            local libName = "lua" .. luaVersion:match("^(%d+%.%d+)") .. ".lib"
+            platform.cp(sdkPath .. sep .. "lib" .. sep .. "lua.lib", sdkPath .. sep .. "lib" .. sep .. libName)
             local ok, out = pcall(
                 cmd.exec,
                 sdkPath

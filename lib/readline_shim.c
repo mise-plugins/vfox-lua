@@ -8,10 +8,14 @@ char *readline(const char *prompt) {
     return linenoise(prompt);
 }
 
-void add_history(const char *line) {
+void using_history(void) {
     if (!history_initialized) {
         linenoiseHistorySetMaxLen(1000);
         history_initialized = 1;
     }
+}
+
+void add_history(const char *line) {
+    using_history();
     linenoiseHistoryAdd(line);
 }

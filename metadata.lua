@@ -14,6 +14,7 @@ PLUGIN = {
     -- setting). Detection is the source of truth; the `packages` map only provides
     -- remediation hints.
     systemDependencies = {
+        { bin = "zig", packages = { brew = "zig", apt = "zig", dnf = "zig" } },
         { bin = "make", packages = { brew = "make", apt = "build-essential", dnf = "make" } },
     },
 }

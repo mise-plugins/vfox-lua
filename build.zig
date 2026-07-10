@@ -27,7 +27,7 @@ pub fn build(b: *std.Build) !void {
         @panic("src/ directory not found — run zig build from extracted Lua source root");
     defer src_dir.close(b.graph.io);
 
-    var lib_srcs = std.ArrayList([]const u8).empty;
+    var lib_srcs = std.ArrayListUnmanaged([]const u8).empty;
     defer lib_srcs.deinit(b.allocator);
 
     var iter = src_dir.iterate();
@@ -41,7 +41,7 @@ pub fn build(b: *std.Build) !void {
     const src_root = b.path("src");
     const os_tag = target.result.os.tag;
 
-    var flags = std.ArrayList([]const u8).empty;
+    var flags = std.ArrayListUnmanaged([]const u8).empty;
     defer flags.deinit(b.allocator);
 
     try flags.append(b.allocator, "-std=gnu99");
