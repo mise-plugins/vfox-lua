@@ -93,8 +93,8 @@ pub fn build(b: *std.Build) !void {
             .optimize = optimize,
         });
         lua_exe.root_module.addIncludePath(linenoize.path("include"));
-        lua_exe.root_module.addIncludePath(b.path("lib"));
-        lua_exe.root_module.addCSourceFile(.{ .file = b.path("lib/readline_shim.c") });
+        lua_exe.root_module.addIncludePath(b.path("."));
+        lua_exe.root_module.addCSourceFile(.{ .file = b.path("readline_shim.c") });
         lua_exe.root_module.linkLibrary(linenoize.artifact("linenoise"));
     }
 

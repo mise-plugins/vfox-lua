@@ -6,6 +6,8 @@ M.sep = (os_type == "windows") and "\\" or "/"
 
 function M.cp(src, dst)
     if os_type == "windows" then
+        src = src:gsub("\\", "/")
+        dst = dst:gsub("\\", "/")
         local f = io.open(src, "rb")
         if not f then
             return false, "source not found: " .. src
@@ -30,7 +32,10 @@ end
 
 function M.mkdir(path)
     if os_type == "windows" then
-        os.execute('mkdir "' .. path .. '" 2>nul')
+        local p = io.popen('mkdir "' .. path .. '" 2>nul')
+        if p then
+            p:close()
+        end
     else
         os.execute("mkdir -p '" .. path .. "' 2>/dev/null")
     end
@@ -41,7 +46,10 @@ function M.mv(src, dst)
         local ok, _ = pcall(os.rename, src, dst)
         if not ok then
             M.cp(src, dst)
-            os.execute('del /f /q "' .. src .. '" 2>nul')
+            local p = io.popen('del /f /q "' .. src .. '" 2>nul')
+            if p then
+                p:close()
+            end
         end
     else
         local ok = os.execute("mv '" .. src .. "' '" .. dst .. "' 2>/dev/null")
@@ -88,8 +96,14 @@ end
 
 function M.rm(path)
     if os_type == "windows" then
-        os.execute('rmdir /s /q "' .. path .. '" 2>nul')
-        os.execute('del /f /q "' .. path .. '" 2>nul')
+        local p = io.popen('rmdir /s /q "' .. path .. '" 2>nul')
+        if p then
+            p:close()
+        end
+        p = io.popen('del /f /q "' .. path .. '" 2>nul')
+        if p then
+            p:close()
+        end
     else
         os.execute("rm -rf '" .. path .. "' 2>/dev/null")
     end

@@ -20,30 +20,54 @@ function PLUGIN:PostInstall(ctx)
     local plug = RUNTIME.pluginDirPath
 
     -- Copy build.zig and readline shim into extracted source tree
+    -- Shim files are flattened to root level to avoid creating lib/ before the zig install move
     platform.mkdir(join(sdkPath, "readline"))
 
     local files = {
         "build.zig",
         "build.zig.zon",
-        "lib/readline_shim.c",
-        "lib/readline/readline.h",
-        "lib/readline/history.h",
+        { src = "lib/readline_shim.c", dst = "readline_shim.c" },
+        { src = "lib/readline/readline.h", dst = "readline/readline.h" },
+        { src = "lib/readline/history.h", dst = "readline/history.h" },
     }
     for _, f in ipairs(files) do
-        local normal = f:gsub("/", sep)
-        if not platform.cp(join(plug, normal), join(sdkPath, normal)) then
-            error("Failed to copy " .. f)
+        local src, dst
+        if type(f) == "string" then
+            src = plug .. "/" .. f
+            dst = sdkPath .. "/" .. f
+        else
+            src = plug .. "/" .. f.src
+            dst = sdkPath .. "/" .. f.dst
+        end
+        if not platform.cp(src, dst) then
+            error("Failed to copy " .. (type(f) == "string" and f or f.src))
         end
     end
-
     -- Build Lua via zig (compiles liblua.a, lua, luac, and installs headers)
+    -- Resolve zig path: mise which works for mise-managed zig; fallback to plain "zig" for standalone vfox
+    local zig_bin = "zig"
+    local f = io.popen("mise which zig 2>nul")
+    if f then
+        local path = f:read("*l")
+        f:close()
+        if path and #path > 0 then
+            zig_bin = path
+        end
+    end
     local ok, out = pcall(
         cmd.exec,
-        "zig build --build-file " .. sdkPath .. sep .. "build.zig -Dreadline --prefix " .. sdkPath .. sep .. "install",
+        zig_bin
+            .. " build --build-file "
+            .. sdkPath
+            .. sep
+            .. "build.zig -Dreadline --prefix "
+            .. sdkPath
+            .. sep
+            .. "install",
         { cwd = sdkPath }
     )
     if not ok then
-        error("zig build failed:\n" .. out)
+        error("zig build failed: " .. tostring(out))
     end
 
     -- Move build artifacts from install/ to sdkPath root
@@ -53,7 +77,16 @@ function PLUGIN:PostInstall(ctx)
     end
 
     -- Remove build artifacts and source files
-    for _, item in ipairs({ "install", "zig-out", ".zig-cache", "zig-pkg", "build.zig", "build.zig.zon", "readline" }) do
+    for _, item in ipairs({
+        "install",
+        "zig-out",
+        ".zig-cache",
+        "zig-pkg",
+        "build.zig",
+        "build.zig.zon",
+        "readline",
+        "readline_shim.c",
+    }) do
         platform.rm(join(sdkPath, item))
     end
 
@@ -111,7 +144,7 @@ function PLUGIN:PostInstall(ctx)
                 { cwd = luarocksDir }
             )
             if not ok then
-                error("luarocks install failed:\n" .. out)
+                error("luarocks install failed:\n" .. tostring(out))
             end
         else
             -- Unix: configure + make bootstrap
@@ -131,7 +164,7 @@ function PLUGIN:PostInstall(ctx)
             if ok then
                 local ok2, out2 = pcall(cmd.exec, "make bootstrap", { cwd = luarocksDir })
                 if not ok2 then
-                    error("luarocks build failed:\n" .. out2)
+                    error("luarocks build failed:\n" .. tostring(out2))
                 end
             end
         end

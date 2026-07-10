@@ -30,6 +30,7 @@ const LUA_VERSION = process.env.LUA_TEST_VERSION || "5.4.7";
 
 run("mise plugin link --force lua .");
 run("mise cache clear");
+run(`mise uninstall lua@${LUA_VERSION}`);
 run(`mise install lua@${LUA_VERSION}`);
 
 test("lua binary reports correct version", () => {
