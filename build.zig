@@ -63,6 +63,7 @@ pub fn build(b: *std.Build) !void {
 
     if (optimize == .Debug) {
         try flags.append(b.allocator, "-DLUA_USE_APICHECK");
+        try flags.append(b.allocator, "-fno-sanitize=undefined");
     }
 
     const lib_module = b.createModule(.{
