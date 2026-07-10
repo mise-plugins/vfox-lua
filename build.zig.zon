@@ -1,0 +1,12 @@
+.{
+    .name = .vfox_lua,
+    .version = "0.16.0",
+    .dependencies = .{
+        .linenoize = .{
+            .url = "git+https://github.com/hazre/linenoize.git#ddfa9a28c607b77359b2b28b84495699759ae3b5",
+            .hash = "linenoize-0.1.1-J7HK8IT0AABVYIWXsdseNxD1rOuQmikD0tmd1BYlTnFv",
+        },
+    },
+    .paths = .{""},
+    .fingerprint = 0x6d25d9ed3c490967,
+}

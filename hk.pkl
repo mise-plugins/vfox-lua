@@ -11,6 +11,11 @@ local linters = new Mapping<String, Step> {
         check = "stylua --check {{files}}"
         fix = "stylua {{files}}"
     }
+    ["zig-fmt"] {
+        glob = "*.zig"
+        check = "zig fmt --check {{files}}"
+        fix = "zig fmt {{files}}"
+    }
     ["actionlint"] {
         glob = ".github/workflows/*.{yml,yaml}"
         check = "actionlint {{files}}"

@@ -6,34 +6,14 @@ A [vfox](https://github.com/version-fox/vfox) / [mise](https://mise.jdx.dev) plu
 
 - **Dynamic version fetching**: Automatically fetches available versions from lua.org
 - **Always up-to-date**: No static version list to maintain
-- **Compiles from source**: Uses official Lua source releases
+- **Compiles from source** via Zig: Cross-platform build with a single compiler
 - **LuaRocks included**: Automatically installs LuaRocks for Lua 5.x versions
-- **Cross-platform**: Works on Linux and macOS
+- **Cross-platform**: Works on Linux, macOS, and Windows
 
 ## Requirements
 
-- A C compiler (gcc or clang)
-- make
-- curl
-
-### macOS
-
-```bash
-xcode-select --install
-```
-
-### Debian/Ubuntu
-
-```bash
-sudo apt-get install build-essential libreadline-dev
-```
-
-### RHEL/CentOS
-
-```bash
-sudo yum groupinstall "Development Tools"
-sudo yum install readline-devel
-```
+- [Zig](https://ziglang.org/download/) 0.16.0
+- make (not needed on Windows)
 
 ## Installation
 
@@ -81,7 +61,7 @@ This plugin:
 
 1. Fetches the list of available versions from [lua.org/ftp](https://www.lua.org/ftp/)
 2. Downloads the source tarball for the requested version
-3. Compiles Lua from source using `make`
+3. Copies `build.zig` and a readline shim into the source tree, then compiles with `zig build`
 4. Installs LuaRocks (for Lua 5.x versions)
 
 ## License
